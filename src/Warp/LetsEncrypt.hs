@@ -20,6 +20,7 @@ import Network.HTTP.Types (status200, status404)
 import System.IO.Temp (createTempDirectory)
 import Control.Monad.Trans.Resource (allocate)
 import Data.Function (fix)
+import Control.Concurrent.Async.Lifted.Safe (Concurrently (..))
 
 data LetsEncryptSettings = LetsEncryptSettings
   { lesInsecureSettings :: !Settings
@@ -88,7 +89,6 @@ leader LetsEncryptSettings {..} exeName rootDir _ignorePrevState = do
                (ZipSink (linesUnboundedAsciiC .| checkFilesReady))
              -- *> ZipSink stderrC)
     atomically $ readTVar filesReady >>= checkSTM
-    say "verification ready"
     let dir = rootDir </> htdocs </> ""
     files <- sourceDirectoryDeep True dir .| foldMapMC
       (\fp -> do
@@ -98,7 +98,6 @@ leader LetsEncryptSettings {..} exeName rootDir _ignorePrevState = do
               Just suffix -> return $ fromMaybe suffix $ stripPrefix "/" suffix
           bs <- readFile fp
           return $ singletonMap suffix bs)
-    say $ "found files: " ++ tshow (keys files)
     yield $ LESChallenge files
     checkExitCode p
 

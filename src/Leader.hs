@@ -16,6 +16,8 @@ module Leader
   ) where
 
 import ClassyPrelude.Conduit
+import Control.Monad.Trans.Unlift (askRunBase, MonadBaseUnlift)
+import Control.Concurrent.Async.Lifted.Safe (Concurrently (..), withAsync)
 
 newtype StateId = StateId Word
   deriving Eq

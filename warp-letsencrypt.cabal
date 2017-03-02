@@ -29,6 +29,8 @@ library
                      , wai-extra
                      , mime-types
                      , resourcet
+                     , monad-unlift
+                     , lifted-async
   default-language:    Haskell2010
 
 executable warp-letsencrypt-example
