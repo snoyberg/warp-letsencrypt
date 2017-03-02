@@ -145,7 +145,7 @@ follower LetsEncryptSettings {..} (LESChallenge files moldCerts) =
         Nothing -> insecure
         Just oldCerts -> runConcurrently
           $ Concurrently insecure
-         *> Concurrently (runTLS (mkTlsSettings oldCerts) lesSecureSettings lesApp)
+         *> Concurrently (runTLS (mkTlsSettings oldCerts) lesSecureSettings $ addSecureHeader lesApp)
     app req send = do
       let path = intercalate "/" $ pathInfo req
           mime = defaultMimeLookup path
@@ -155,11 +155,17 @@ follower LetsEncryptSettings {..} (LESChallenge files moldCerts) =
 follower LetsEncryptSettings {..} (LESCerts certInfo) =
   liftIO $ runConcurrently $ Concurrently secure *> Concurrently insecure
   where
-    secure = runTLS (mkTlsSettings certInfo) lesSecureSettings lesApp
+    secure = runTLS (mkTlsSettings certInfo) lesSecureSettings (addSecureHeader lesApp)
 
     insecure = runSettings lesInsecureSettings lesApp
 
 mkTlsSettings (CertInfo cert chain privkey) = tlsSettingsChainMemory cert [chain] privkey
+
+addSecureHeader app req send =
+    app req' send
+  where
+    req' = req
+        { requestHeaders = ("X-Forwarded-Proto", "https") : requestHeaders req }
 
 findFirstExe :: [String] -> IO FilePath
 findFirstExe origs =
