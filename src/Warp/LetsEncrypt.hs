@@ -28,6 +28,7 @@ data LetsEncryptSettings = LetsEncryptSettings
   , lesEmailAddress :: !Text
   , lesDomains :: ![Text]
   , lesApp :: !Application
+  , lesBeforeSecure :: !(IO ())
   }
 
 config, work, logs, htdocs :: FilePath
@@ -37,7 +38,8 @@ logs = "logs"
 htdocs = "htdocs"
 
 data LEState
-  = LESChallenge (Map FilePath ByteString)
+  = LESJustInsecure
+  | LESChallenge (Map FilePath ByteString)
   | LESCerts ByteString ByteString ByteString
   deriving Eq
 
@@ -61,7 +63,11 @@ leader :: MonadResource m
        -> FilePath
        -> Maybe LEState
        -> ConduitM () LEState m LEState
-leader LetsEncryptSettings {..} exeName rootDir _ignorePrevState = do
+leader LetsEncryptSettings {..} exeName rootDir mprevState = do
+  case mprevState of
+    Just (LESCerts _ _ _) -> return ()
+    _ -> yield LESJustInsecure
+  liftIO lesBeforeSecure
   let pc = setStdin closed $ setStderr createSource $ proc exeName
         [ "certonly"
         , "--non-interactive", "--verbose"
@@ -124,6 +130,8 @@ leader LetsEncryptSettings {..} exeName rootDir _ignorePrevState = do
         ]
 
 follower :: MonadIO m => LetsEncryptSettings -> LEState -> m ()
+follower LetsEncryptSettings {..} LESJustInsecure =
+    liftIO $ runSettings lesInsecureSettings lesApp
 follower LetsEncryptSettings {..} (LESChallenge files) =
     liftIO $ runSettings lesInsecureSettings app
   where

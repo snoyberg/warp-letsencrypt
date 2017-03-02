@@ -13,6 +13,7 @@ main = runLetsEncrypt LetsEncryptSettings
   , lesEmailAddress = "michael@snoyman.com"
   , lesDomains = ["tlstest.snoyman.com", "tlstest.yesodweb.com"]
   , lesApp = dummyApp
+  , lesBeforeSecure = return ()
   }
 
 dummyApp :: Application
