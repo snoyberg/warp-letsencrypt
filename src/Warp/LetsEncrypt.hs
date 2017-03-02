@@ -13,7 +13,6 @@ import Leader
 import Network.Wai
 import Network.Wai.Handler.Warp (runSettings, Settings, setBeforeMainLoop)
 import Network.Wai.Handler.WarpTLS (runTLS, tlsSettingsChainMemory)
-import Network.Wai.Middleware.ForceSSL (forceSSL)
 import System.Process.Typed
 import System.Directory (findExecutable, doesFileExist, createDirectoryIfMissing, getTemporaryDirectory, removeDirectoryRecursive)
 import Network.Mime (defaultMimeLookup)
@@ -132,9 +131,9 @@ follower LetsEncryptSettings {..} (LESChallenge files) =
     app req send = do
       let path = intercalate "/" $ pathInfo req
           mime = defaultMimeLookup path
-      send $ case lookup (unpack path) files of
-        Nothing -> responseBuilder status404 [] "Not found"
-        Just bs -> responseBuilder status200 [("Content-Type", mime)] (toBuilder bs)
+      case lookup (unpack path) files of
+        Nothing -> lesApp req send
+        Just bs -> send $ responseBuilder status200 [("Content-Type", mime)] (toBuilder bs)
 follower LetsEncryptSettings {..} (LESCerts cert chain privkey) =
   liftIO $ runConcurrently $ Concurrently secure *> Concurrently insecure
   where
@@ -142,7 +141,7 @@ follower LetsEncryptSettings {..} (LESCerts cert chain privkey) =
       let tlsSettings = tlsSettingsChainMemory cert [chain] privkey
       runTLS tlsSettings lesSecureSettings lesApp
 
-    insecure = runSettings lesInsecureSettings $ forceSSL lesApp
+    insecure = runSettings lesInsecureSettings lesApp
 
 findFirstExe :: [String] -> IO FilePath
 findFirstExe origs =
