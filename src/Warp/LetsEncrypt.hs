@@ -39,9 +39,12 @@ htdocs = "htdocs"
 
 data LEState
   = LESJustInsecure
-  | LESChallenge (Map FilePath ByteString)
-  | LESCerts ByteString ByteString ByteString
+  | LESChallenge (Map FilePath ByteString) (Maybe CertInfo)
+  | LESCerts CertInfo
   deriving Eq
+
+data CertInfo = CertInfo ByteString ByteString ByteString
+    deriving Eq
 
 runLetsEncrypt :: MonadIO m => LetsEncryptSettings -> m ()
 runLetsEncrypt les = liftIO $ runResourceT $ do
@@ -64,9 +67,11 @@ leader :: MonadResource m
        -> Maybe LEState
        -> ConduitM () LEState m LEState
 leader LetsEncryptSettings {..} exeName rootDir mprevState = do
-  case mprevState of
-    Just (LESCerts _ _ _) -> return ()
-    _ -> yield LESJustInsecure
+  moldCerts <- case mprevState of
+    Just (LESCerts certs) -> return $ Just certs
+    Just (LESChallenge _ moldCerts) -> return moldCerts
+    Just LESJustInsecure -> return Nothing
+    Nothing -> yield LESJustInsecure $> Nothing
   liftIO lesBeforeSecure
   let pc = setStdin closed $ setStderr createSource $ proc exeName
         [ "certonly"
@@ -104,7 +109,7 @@ leader LetsEncryptSettings {..} exeName rootDir mprevState = do
               Just suffix -> return $ fromMaybe suffix $ stripPrefix "/" suffix
           bs <- readFile fp
           return $ singletonMap suffix bs)
-    yield $ LESChallenge files
+    yield $ LESChallenge files moldCerts
     checkExitCode p
 
     domain <-
@@ -117,7 +122,7 @@ leader LetsEncryptSettings {..} exeName rootDir mprevState = do
       cert <- readFile' "cert.pem"
       chain <- readFile' "chain.pem"
       privkey <- readFile' "privkey.pem"
-      yield $ LESCerts cert chain privkey
+      yield $ LESCerts $ CertInfo cert chain privkey
 
       threadDelay $ 1000 * 1000 * 60 * 60 * 12 -- 12 hours
       runProcess_ $ proc exeName
@@ -132,23 +137,29 @@ leader LetsEncryptSettings {..} exeName rootDir mprevState = do
 follower :: MonadIO m => LetsEncryptSettings -> LEState -> m ()
 follower LetsEncryptSettings {..} LESJustInsecure =
     liftIO $ runSettings lesInsecureSettings lesApp
-follower LetsEncryptSettings {..} (LESChallenge files) =
-    liftIO $ runSettings lesInsecureSettings app
+follower LetsEncryptSettings {..} (LESChallenge files moldCerts) =
+    liftIO $ withSecure $ runSettings lesInsecureSettings app
   where
+    withSecure insecure =
+      case moldCerts of
+        Nothing -> insecure
+        Just oldCerts -> runConcurrently
+          $ Concurrently insecure
+         *> Concurrently (runTLS (mkTlsSettings oldCerts) lesSecureSettings lesApp)
     app req send = do
       let path = intercalate "/" $ pathInfo req
           mime = defaultMimeLookup path
       case lookup (unpack path) files of
         Nothing -> lesApp req send
         Just bs -> send $ responseBuilder status200 [("Content-Type", mime)] (toBuilder bs)
-follower LetsEncryptSettings {..} (LESCerts cert chain privkey) =
+follower LetsEncryptSettings {..} (LESCerts certInfo) =
   liftIO $ runConcurrently $ Concurrently secure *> Concurrently insecure
   where
-    secure = do
-      let tlsSettings = tlsSettingsChainMemory cert [chain] privkey
-      runTLS tlsSettings lesSecureSettings lesApp
+    secure = runTLS (mkTlsSettings certInfo) lesSecureSettings lesApp
 
     insecure = runSettings lesInsecureSettings lesApp
+
+mkTlsSettings (CertInfo cert chain privkey) = tlsSettingsChainMemory cert [chain] privkey
 
 findFirstExe :: [String] -> IO FilePath
 findFirstExe origs =
