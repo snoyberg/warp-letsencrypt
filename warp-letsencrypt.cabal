@@ -22,7 +22,7 @@ library
                      , warp
                      , warp-tls
                      , http-types
-                     , classy-prelude
+                     , classy-prelude-conduit
                      , typed-process
                      , temporary
                      , directory
@@ -48,7 +48,7 @@ test-suite         warp-letsencrypt-test
     hs-source-dirs:     test
     build-depends:      base
                       , warp-letsencrypt
-                      , classy-prelude
+                      , classy-prelude-conduit
                       , hspec
     other-modules:      LeaderSpec
 

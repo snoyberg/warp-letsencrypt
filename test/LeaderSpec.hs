@@ -2,7 +2,7 @@
 module LeaderSpec (spec) where
 
 import Test.Hspec
-import ClassyPrelude
+import ClassyPrelude.Conduit
 import Leader
 
 spec :: Spec
