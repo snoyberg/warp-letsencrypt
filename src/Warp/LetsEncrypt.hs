@@ -64,7 +64,7 @@ leader :: MonadResource m
 leader LetsEncryptSettings {..} exeName rootDir _ignorePrevState = do
   let pc = setStdin closed $ setStderr createSource $ proc exeName
         [ "certonly"
-        , "--non-interactive"
+        , "--non-interactive", "--verbose"
         , "--email", unpack lesEmailAddress
         , "--agree-tos", "--webroot"
         , "--config-dir", rootDir </> config
@@ -80,14 +80,16 @@ leader LetsEncryptSettings {..} exeName rootDir _ignorePrevState = do
             let ready = atomically $ writeTVar filesReady True
             case mbs of
                 Nothing -> ready
-                Just "Waiting for verification..." -> ready
-                Just _ -> loop
+                Just bs
+                  | "verification" `isInfixOf` bs -> ready
+                  | otherwise -> loop
     liftIO $ runConduit
            $ getStderr p
           .| getZipSink
-               (ZipSink (linesUnboundedAsciiC .| checkFilesReady)
-             *> ZipSink stderrC)
+               (ZipSink (linesUnboundedAsciiC .| checkFilesReady))
+             -- *> ZipSink stderrC)
     atomically $ readTVar filesReady >>= checkSTM
+    say "verification ready"
     let dir = rootDir </> htdocs </> ""
     files <- sourceDirectoryDeep True dir .| foldMapMC
       (\fp -> do
