@@ -28,6 +28,7 @@ library
                      , directory
                      , wai-extra
                      , mime-types
+                     , resourcet
   default-language:    Haskell2010
 
 executable warp-letsencrypt-example

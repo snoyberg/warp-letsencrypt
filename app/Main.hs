@@ -12,7 +12,8 @@ main = runLetsEncrypt LetsEncryptSettings
   , lesSecureSettings = setPort 8443 defaultSettings
   , lesEmailAddress = "michael@snoyman.com"
   , lesDomains = ["tlstest.snoyman.com", "tlstest.yesodweb.com"]
-  } dummyApp
+  , lesApp = dummyApp
+  }
 
 dummyApp :: Application
 dummyApp _ send = send $ responseLBS status200 [] "Hello World!"
