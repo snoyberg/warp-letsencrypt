@@ -1,17 +1,24 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE OverloadedStrings #-}
 module LeaderSpec (spec) where
 
 import Test.Hspec
 import ClassyPrelude.Conduit
 import Leader
+import Leader.Consul
 
 spec :: Spec
 spec = do
-  describe "TLS sanity checks" $ do
+  describe "TLS sanity checks" $ sanity mkTLSJudge
+  describe "TLS or Consul sanity checks" $ sanity $ mkConsulOrTLSJudge "leader-test"
+
+sanity :: (forall a. IO (Judge IO a)) -> Spec
+sanity mkJudge = do
     it "runs the leader once" $ do
       leaderCount <- newTVarIO (0 :: Int)
       followerCount <- newTVarIO (0 :: Int)
-      judge <- mkTLSJudge
+      judge <- mkJudge
       let follower = mkFollower
             (\mstate ->
                case mstate of

@@ -10,6 +10,7 @@ module Warp.LetsEncrypt
 
 import ClassyPrelude.Conduit
 import Leader
+import Leader.Consul
 import Network.Wai
 import Network.Wai.Handler.Warp (runSettings, Settings, setBeforeMainLoop)
 import Network.Wai.Handler.WarpTLS (runTLS, tlsSettingsChainMemory)
@@ -46,15 +47,18 @@ data LEState
 data CertInfo = CertInfo ByteString ByteString ByteString
     deriving Eq
 
-runLetsEncrypt :: MonadIO m => LetsEncryptSettings -> m ()
-runLetsEncrypt les = liftIO $ runResourceT $ do
+runLetsEncrypt :: MonadIO m
+               => Text -- ^ consul prefix
+               -> LetsEncryptSettings
+               -> m ()
+runLetsEncrypt prefix les = liftIO $ runResourceT $ do
   tempDir <- liftIO getTemporaryDirectory
   (releaseKey, rootDir) <- allocate
     (createTempDirectory tempDir "warp-letsencrypt")
     (void . tryIO . removeDirectoryRecursive)
 
   liftIO $ createDirectoryIfMissing True $ rootDir </> htdocs
-  judge <- mkTLSJudge
+  judge <- mkConsulOrTLSJudge prefix
   exeName <- liftIO $ findFirstExe ["letsencrypt", "certbot"]
   runFollower judge $ mkFollower
     (debounceLeader (leader les exeName rootDir))

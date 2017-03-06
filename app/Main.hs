@@ -7,7 +7,7 @@ import Network.Wai.Handler.Warp
 import Network.HTTP.Types (status200)
 
 main :: IO ()
-main = runLetsEncrypt LetsEncryptSettings
+main = runLetsEncrypt "warp-letsencrypt-example" LetsEncryptSettings
   { lesInsecureSettings = setPort 8080 defaultSettings
   , lesSecureSettings = setPort 8443 defaultSettings
   , lesEmailAddress = "michael@snoyman.com"
