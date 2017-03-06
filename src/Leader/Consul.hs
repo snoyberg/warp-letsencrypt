@@ -3,24 +3,30 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Leader.Consul
   ( mkConsulJudge
-  , mkConsulOrTLSJudge
+  , mkConsulOrInMemoryJudge
+  , ConsulSettings (..)
   ) where
 
 import ClassyPrelude.Conduit
 import Leader
 import Network.HTTP.Simple
 
+data ConsulSettings = ConsulSettings
+  { consulPrefix :: !Text
+  }
+
 mkConsulJudge :: (MonadIO m, MonadIO n)
-              => Text -- ^ prefix
+              => ConsulSettings
               -> m (Judge n state)
 mkConsulJudge = undefined
 
-mkConsulOrTLSJudge :: (MonadIO m, MonadIO n, MonadBaseUnlift IO n)
-                   => Text -- ^ prefix
-                   -> m (Judge n state)
-mkConsulOrTLSJudge prefix = do
+mkConsulOrInMemoryJudge
+  :: (MonadIO m, MonadIO n, MonadBaseUnlift IO n)
+  => ConsulSettings
+  -> m (Judge n state)
+mkConsulOrInMemoryJudge prefix = do
   consulRunning <- checkConsul
-  if consulRunning then mkConsulJudge prefix else mkTLSJudge
+  if consulRunning then mkConsulJudge prefix else mkInMemoryJudge
 
 checkConsul :: MonadIO m => m Bool
 checkConsul = liftIO $ do

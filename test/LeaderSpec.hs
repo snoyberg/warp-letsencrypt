@@ -10,8 +10,10 @@ import Leader.Consul
 
 spec :: Spec
 spec = do
-  describe "TLS sanity checks" $ sanity mkTLSJudge
-  describe "TLS or Consul sanity checks" $ sanity $ mkConsulOrTLSJudge "leader-test"
+  describe "In memory sanity checks" $ sanity mkInMemoryJudge
+  describe "In memory or Consul sanity checks" $ sanity $ mkConsulOrInMemoryJudge ConsulSettings
+    { consulPrefix = "leader-test"
+    }
 
 sanity :: (forall a. IO (Judge IO a)) -> Spec
 sanity mkJudge = do

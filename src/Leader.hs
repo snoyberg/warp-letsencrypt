@@ -8,7 +8,7 @@ module Leader
   , Follower
   , LeaderFunction
   , FollowerFunction
-  , mkTLSJudge
+  , mkInMemoryJudge
   , mkFollower
   , debounceLeader
   , killableFollower
@@ -25,8 +25,8 @@ newtype StateId = StateId Word
 -- | Decides who will be the leader
 newtype Judge m state = Judge (Follower m state -> m ())
 
-mkTLSJudge :: forall state m n. (MonadIO m, MonadIO n, MonadBaseUnlift IO n) => m (Judge n state)
-mkTLSJudge = liftIO $ do
+mkInMemoryJudge :: forall state m n. (MonadIO m, MonadIO n, MonadBaseUnlift IO n) => m (Judge n state)
+mkInMemoryJudge = liftIO $ do
   leaderBaton <- newMVar ()
   stateVar :: TVar (Maybe (StateId, state)) <- newTVarIO Nothing
   stateIdVar <- newTVarIO 0
