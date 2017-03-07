@@ -99,11 +99,17 @@ leader LetsEncryptSettings {..} exeName rootDir mprevState = do
                 Just bs
                   | "verification" `isInfixOf` bs -> ready
                   | otherwise -> loop
-    liftIO $ runConduit
-           $ getStderr p
-          .| getZipSink
-               (ZipSink (linesUnboundedAsciiC .| checkFilesReady))
-             -- *> ZipSink stderrC)
+
+    errVar <- liftIO newEmptyTMVarIO
+
+    liftIO
+         $ fork
+         $ runConduit
+         $ getStderr p
+        .| getZipSink
+               (ZipSink (linesUnboundedAsciiC .| checkFilesReady)
+                *> ZipSink (sinkLazy >>= atomically . putTMVar errVar))
+
     atomically $ readTVar filesReady >>= checkSTM
     let dir = rootDir </> htdocs </> ""
     files <- sourceDirectoryDeep True dir .| foldMapMC
@@ -115,7 +121,9 @@ leader LetsEncryptSettings {..} exeName rootDir mprevState = do
           bs <- readFile fp
           return $ singletonMap suffix bs)
     yield $ LESChallenge files moldCerts
-    checkExitCode p
+    liftIO $ checkExitCode p `onException` do
+      err <- atomically $ takeTMVar errVar
+      runConduit $ sourceLazy err .| stderrC
 
     domain <-
       case lesDomains of
