@@ -10,6 +10,7 @@ module Leader.Consul
 import ClassyPrelude.Conduit
 import Leader
 import Network.HTTP.Simple
+import Control.Monad.Trans.Unlift (MonadBaseUnlift)
 
 data ConsulSettings = ConsulSettings
   { consulPrefix :: !Text
@@ -30,7 +31,7 @@ mkConsulOrInMemoryJudge prefix = do
 
 checkConsul :: MonadIO m => m Bool
 checkConsul = liftIO $ do
-  eres <- tryAny $ httpNoBody "http://localhost:8500/v1/status/leader"
+  eres <- tryAny $ httpLBS $ setRequestMethod "HEAD" "http://localhost:8500/v1/status/leader"
   return $ case eres of
     Right res -> getResponseStatusCode res == 200
     Left _ -> False
